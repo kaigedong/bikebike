@@ -1,6 +1,7 @@
 package com.bikebike.app.ui
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -313,16 +314,14 @@ private fun LogSection(
                 Text("暂无日志", style = MaterialTheme.typography.bodySmall)
             } else {
                 logLines.takeLast(50).forEach { line ->
-                    SelectionContainer {
-                        Text(
-                            line,
-                            style = MaterialTheme.typography.bodySmall.copy(
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 10.sp
-                            ),
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
+                    Text(
+                        line,
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 10.sp
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
             }
         }

@@ -1,6 +1,8 @@
 package com.bikebike.app.viewmodel
 
 import android.app.Application
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import com.bikebike.app.ble.*
@@ -85,10 +87,9 @@ class BikeViewModel(application: Application) : AndroidViewModel(application) {
         bleManager.startScan()
 
         // Auto-stop scanning state after scan completes
-        kotlinx.coroutines.MainScope().launch {
-            kotlinx.coroutines.delay(11_000)
+        Handler(Looper.getMainLooper()).postDelayed({
             _isScanning.value = false
-        }
+        }, 11_000)
     }
 
     fun connectToDevice(device: ScannedDevice) {
