@@ -1,0 +1,16 @@
+[package]
+name = "keep-core"
+version = "0.1.0"
+edition = "2021"
+description = "Keep bike private protocol core library"
+
+[lib]
+name = "keep_core"
+crate-type = ["lib", "cdylib", "staticlib"]
+
+[dependencies]
+thiserror = "2"
+log = "0.4"
+
+[dev-dependencies]
+env_logger = "0.11"

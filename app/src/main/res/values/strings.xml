@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">BikeBike</string>
+    <string name="no_bluetooth_support">此设备不支持蓝牙低功耗</string>
+    <string name="permission_required">需要蓝牙和位置权限</string>
+    <string name="scanning">正在扫描 Keep 设备…</string>
+    <string name="connected">已连接</string>
+    <string name="disconnected">已断开</string>
+    <string name="connecting">正在连接…</string>
+</resources>

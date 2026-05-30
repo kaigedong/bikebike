@@ -1,0 +1,89 @@
+name: Build APK
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ hashFiles('**/*.gradle.kts', 'gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: gradle-
+
+      - name: Cache Rust target
+        uses: actions/cache@v4
+        with:
+          path: |
+            keep-core/target
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: rust-android-${{ hashFiles('keep-core/Cargo.lock') }}
+          restore-keys: rust-android-
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
+
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk
+
+      - name: Setup NDK path
+        run: |
+          NDK_VERSION=$(ls $ANDROID_HOME/ndk/ | head -1)
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/$NDK_VERSION" >> $GITHUB_ENV
+
+      - name: Build Rust keep-core (Android targets)
+        run: |
+          cd keep-core
+          cargo ndk -t arm64-v8a -t armeabi-v7a -t x86_64 \
+            -o ../app/src/main/jniLibs build --release
+
+      - name: Run Rust tests
+        run: |
+          cd keep-core
+          cargo test
+
+      - name: Make gradlew executable
+        run: chmod +x gradlew || true
+
+      - name: Build APK
+        run: ./gradlew assembleDebug
+
+      - name: Upload Debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: bikebike-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+
+  check-crates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for crate updates
+        uses: create-rust-app/crate-updates@v1
+        with:
+          working-directory: keep-core
