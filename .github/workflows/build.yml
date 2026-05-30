@@ -23,14 +23,10 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Cache Gradle packages
-        uses: actions/cache@v4
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
         with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: gradle-${{ hashFiles('**/*.gradle.kts', 'gradle/wrapper/gradle-wrapper.properties') }}
-          restore-keys: gradle-
+          cache-read-only: false
 
       - name: Cache Rust target
         uses: actions/cache@v4
@@ -66,9 +62,6 @@ jobs:
           cd keep-core
           cargo test
 
-      - name: Make gradlew executable
-        run: chmod +x gradlew || true
-
       - name: Build APK
         run: ./gradlew assembleDebug
 
@@ -78,12 +71,35 @@ jobs:
           name: bikebike-debug-apk
           path: app/build/outputs/apk/debug/*.apk
 
-  check-crates:
+  # Check for Rust crate updates and auto-create PR
+  crate-updates:
     runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
       - name: Check for crate updates
-        uses: create-rust-app/crate-updates@v1
+        working-directory: keep-core
+        run: |
+          cargo install cargo-outdated
+          cargo outdated --format markdown > ../crate_update_report.md
+          cat ../crate_update_report.md
+
+      - name: Create issue for updates
+        uses: actions/github-script@v7
         with:
-          working-directory: keep-core
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('crate_update_report.md', 'utf8');
+            if (report.includes('|')) {
+              github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: '📦 Rust crate updates available',
+                body: report,
+                labels: ['dependencies']
+              });
+            }

@@ -43,8 +43,8 @@ android {
 
     packaging {
         jniLibs {
-            // Include .so files from keep-core native build
-            srcDirs(listOf("${project.rootDir}/keep-core/target/android-jniLibs"))
+            // Include .so files from keep-core native build (cargo-ndk output)
+            srcDir("${project.rootDir}/app/src/main/jniLibs")
         }
     }
 }
