@@ -41,12 +41,12 @@ android {
         compose = true
     }
 
-    packaging {
-        jniLibs {
-            // Include .so files from keep-core native build (cargo-ndk output)
-            srcDir("${project.rootDir}/app/src/main/jniLibs")
-        }
-    }
+    // jniLibs will be configured when Rust native lib is integrated via UniFFI
+    // packaging {
+    //     jniLibs {
+    //         srcDir("${project.rootDir}/app/src/main/jniLibs")
+    //     }
+    // }
 }
 
 dependencies {
