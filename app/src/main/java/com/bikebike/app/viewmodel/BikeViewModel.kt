@@ -1,33 +1,41 @@
 package com.bikebike.app.viewmodel
 
 import android.app.Application
+import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import com.bikebike.app.ble.*
+import com.bikebike.app.data.AppSettings
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import org.json.JSONObject
 
-/**
- * ViewModel for bike data and BLE connection state.
- * Bridges the UI and BLE layer.
- */
 class BikeViewModel(application: Application) : AndroidViewModel(application) {
 
     private val TAG = "BikeViewModel"
+    private val settings = AppSettings(application)
+
+    // Identity state
+    private val _identityLoaded = MutableStateFlow(settings.hasIdentity())
+    val identityLoaded: StateFlow<Boolean> = _identityLoaded.asStateFlow()
+
+    private val _identityInfo = MutableStateFlow(
+        if (settings.hasIdentity()) "${settings.bikeName} (${settings.bikeMac})" else ""
+    )
+    val identityInfo: StateFlow<String> = _identityInfo.asStateFlow()
+
+    // Log toggle
+    private val _logEnabled = MutableStateFlow(settings.logEnabled)
+    val logEnabled: StateFlow<Boolean> = _logEnabled.asStateFlow()
 
     private val bleManager = BleManager(application).apply {
         onDeviceFound = { device ->
             val current = _scannedDevices.value.toMutableList()
-            // Update or add device
             val idx = current.indexOfFirst { it.address == device.address }
-            if (idx >= 0) {
-                current[idx] = device
-            } else {
-                current.add(device)
-            }
+            if (idx >= 0) current[idx] = device else current.add(device)
             _scannedDevices.value = current
         }
 
@@ -40,14 +48,23 @@ class BikeViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         onLog = { line ->
-            val current = _logLines.value.toMutableList()
-            current.add(line)
-            // Keep last 200 lines
-            if (current.size > 200) {
-                _logLines.value = current.takeLast(200)
-            } else {
-                _logLines.value = current
+            if (_logEnabled.value) {
+                val current = _logLines.value.toMutableList()
+                current.add(line)
+                if (current.size > 500) {
+                    _logLines.value = current.takeLast(500)
+                } else {
+                    _logLines.value = current
+                }
             }
+        }
+    }
+
+    // Init: load identity if available
+    init {
+        val packets = settings.loadHandshakePackets()
+        if (packets.isNotEmpty()) {
+            bleManager.setHandshakePackets(packets)
         }
     }
 
@@ -85,16 +102,13 @@ class BikeViewModel(application: Application) : AndroidViewModel(application) {
         _scannedDevices.value = emptyList()
         _isScanning.value = true
         bleManager.startScan()
-
-        // Auto-stop scanning state after scan completes
         Handler(Looper.getMainLooper()).postDelayed({
             _isScanning.value = false
         }, 11_000)
     }
 
     fun connectToDevice(device: ScannedDevice) {
-        // TODO: Load handshake packets from app storage
-        // For now, try without handshake (will work for FTMS devices)
+        settings.lastDeviceAddress = device.address
         bleManager.connect(device.address)
     }
 
@@ -108,33 +122,61 @@ class BikeViewModel(application: Application) : AndroidViewModel(application) {
         _currentResistance.value = level
     }
 
+    fun setLogEnabled(enabled: Boolean) {
+        _logEnabled.value = enabled
+        settings.logEnabled = enabled
+        if (!enabled) {
+            _logLines.value = emptyList()
+        }
+    }
+
+    fun clearLog() {
+        _logLines.value = emptyList()
+    }
+
     /**
-     * Load handshake packets from identity JSON
+     * Import identity.json from URI (file picker result)
      */
-    fun loadHandshakePackets(packets: List<String>) {
-        bleManager.setHandshakePackets(packets)
+    fun importIdentity(uri: Uri): Result<Int> {
+        return try {
+            val ctx = getApplication<Application>()
+            val json = ctx.contentResolver.openInputStream(uri)?.use { input ->
+                input.bufferedReader().use { it.readText() }
+            } ?: throw Exception("Cannot open file")
+
+            val obj = JSONObject(json)
+            val bikeName = obj.optString("bike_name", "Unknown")
+            val bikeMac = obj.optString("bike_mac", "")
+            val arr = obj.optJSONArray("handshake_packets")
+                ?: throw Exception("No handshake_packets found")
+
+            val packets = (0 until arr.length()).map { arr.getString(it) }
+            if (packets.isEmpty()) throw Exception("handshake_packets is empty")
+
+            settings.saveIdentity(bikeName, bikeMac, packets)
+            bleManager.setHandshakePackets(packets)
+
+            _identityLoaded.value = true
+            _identityInfo.value = "$bikeName ($bikeMac)"
+
+            Result.success(packets.size)
+        } catch (e: Exception) {
+            Log.e(TAG, "Import failed", e)
+            Result.failure(e)
+        }
     }
 
     // ======================== Notification Parsing ========================
 
-    /**
-     * Parse Keep notification data.
-     *
-     * For MVP, this is a Kotlin implementation that mirrors the Rust keep-core logic.
-     * Once UniFFI is wired up, this will call into Rust instead.
-     */
     private fun parseNotification(data: ByteArray) {
         try {
-            // Find data marker: B5 31 30 36 2F 37 FF
             val marker = KeepBleConstants.DATA_MARKER
             val markerIdx = findSubsequence(data, marker)
-
             if (markerIdx < 0) {
                 Log.d(TAG, "No data marker found in notification")
                 return
             }
 
-            // Extract protobuf data after marker, skip last 2 bytes
             val startPtr = markerIdx + marker.size
             if (startPtr >= data.size) return
 
@@ -149,18 +191,14 @@ class BikeViewModel(application: Application) : AndroidViewModel(application) {
             val calories = (fields[4] ?: 0L).toFloat()
             val statusCode = (fields[8] ?: 0L).toInt()
 
-            // Calculate speed from deltas
             val speed = if (duration > prevDuration && distance >= prevDistance) {
                 val deltaD = (distance - prevDistance).toFloat()
                 val deltaT = (duration - prevDuration).toFloat()
                 if (deltaT > 0) (deltaD / deltaT) * 3.6f else 0f
-            } else {
-                0f
-            }
+            } else 0f
             prevDistance = distance
             prevDuration = duration
 
-            // Only report rpm/power when active (status=3)
             val finalRpm = if (statusCode == 3) rpm else 0
             val finalPower = if (statusCode == 3) power else 0
             val finalSpeed = if (statusCode == 3) speed else 0f
@@ -175,32 +213,23 @@ class BikeViewModel(application: Application) : AndroidViewModel(application) {
                 speed = finalSpeed,
                 statusCode = statusCode,
             )
-
-            // Update resistance from bike feedback
             _currentResistance.value = resistance
-
         } catch (e: Exception) {
             Log.e(TAG, "Parse error: ${e.message}")
         }
     }
 
-    /**
-     * Simple protobuf varint decoder
-     */
     private fun decodeProtobuf(data: ByteArray): Map<Int, Long> {
         val results = mutableMapOf<Int, Long>()
         var ptr = 0
-
         while (ptr < data.size) {
             val tag = data[ptr].toInt() and 0xFF
             val fieldNum = tag shr 3
             val wireType = tag and 0x07
             ptr++
-
             when (wireType) {
-                0 -> { // Varint
-                    var result = 0L
-                    var shift = 0
+                0 -> {
+                    var result = 0L; var shift = 0
                     while (ptr < data.size) {
                         val b = data[ptr].toInt() and 0xFF
                         result = result or ((b.toLong() and 0x7F) shl shift)
@@ -210,9 +239,8 @@ class BikeViewModel(application: Application) : AndroidViewModel(application) {
                     }
                     results[fieldNum] = result
                 }
-                2 -> { // Length-delimited
-                    var len = 0L
-                    var shift = 0
+                2 -> {
+                    var len = 0L; var shift = 0
                     while (ptr < data.size) {
                         val b = data[ptr].toInt() and 0xFF
                         len = len or ((b.toLong() and 0x7F) shl shift)
@@ -233,10 +261,7 @@ class BikeViewModel(application: Application) : AndroidViewModel(application) {
         for (i in 0..(haystack.size - needle.size)) {
             var found = true
             for (j in needle.indices) {
-                if (haystack[i + j] != needle[j]) {
-                    found = false
-                    break
-                }
+                if (haystack[i + j] != needle[j]) { found = false; break }
             }
             if (found) return i
         }
