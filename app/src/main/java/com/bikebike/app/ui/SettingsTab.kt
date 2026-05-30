@@ -169,11 +169,9 @@ fun SettingsTab(viewModel: BikeViewModel, modifier: Modifier = Modifier) {
                             text = { Text(langLabels[index]) },
                             onClick = {
                                 langExpanded = false
-                                // Apply language change via AppCompat delegate
-                                val appCtx = context.applicationContext
                                 val activity = context as? android.app.Activity
                                 activity?.let { act ->
-                                    com.bikebike.app.data.LocaleHelper.applyLanguage(
+                                    com.bikebike.app.data.LocaleHelper.switchLanguage(
                                         act, lang.code
                                     )
                                 }

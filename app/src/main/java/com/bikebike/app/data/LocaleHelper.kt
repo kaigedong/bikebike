@@ -2,21 +2,50 @@ package com.bikebike.app.data
 
 import android.app.Activity
 import android.content.Context
-import android.content.ContextWrapper
 import android.os.LocaleList
-import com.bikebike.app.data.AppSettings
 import java.util.Locale
 
 /**
  * Helper to apply locale changes at runtime.
+ *
+ * Key design: split into two functions:
+ * - applyLocale(): silent, only sets config. Called in onCreate every time. NO recreate.
+ * - switchLanguage(): called by user action. Sets config + saves pref + recreates.
  */
 object LocaleHelper {
 
-    fun applyLanguage(activity: Activity, langCode: String) {
+    fun applyLocale(context: Context): Context {
+        val settings = AppSettings(context.applicationContext)
+        val langCode = settings.language.code
         val locale = when (langCode) {
             "zh" -> Locale.SIMPLIFIED_CHINESE
             "en" -> Locale.ENGLISH
-            else -> Locale.getDefault() // system
+            else -> return context // system default, no change needed
+        }
+
+        Locale.setDefault(locale)
+        val config = context.resources.configuration
+        config.setLocale(locale)
+        val localeList = LocaleList(locale)
+        LocaleList.setDefault(localeList)
+        config.setLocales(localeList)
+        return context.createConfigurationContext(config)
+    }
+
+    /**
+     * Called from Settings when user picks a new language.
+     * Saves preference and recreates activity.
+     */
+    fun switchLanguage(activity: Activity, langCode: String) {
+        // Save preference first
+        val ctx = activity.applicationContext
+        AppSettings(ctx).language = AppSettings.Language.fromCode(langCode)
+
+        // Apply and recreate
+        val locale = when (langCode) {
+            "zh" -> Locale.SIMPLIFIED_CHINESE
+            "en" -> Locale.ENGLISH
+            else -> Locale.getDefault()
         }
 
         Locale.setDefault(locale)
@@ -27,25 +56,6 @@ object LocaleHelper {
         config.setLocales(localeList)
         activity.resources.updateConfiguration(config, activity.resources.displayMetrics)
 
-        // Save preference
-        val ctx = activity.applicationContext
-        AppSettings(ctx).language = AppSettings.Language.fromCode(langCode)
-
-        // Recreate activity to apply
         activity.recreate()
-    }
-
-    fun getLocaleContext(context: Context): Context {
-        val settings = AppSettings(context)
-        val langCode = settings.language.code
-        val locale = when (langCode) {
-            "zh" -> Locale.SIMPLIFIED_CHINESE
-            "en" -> Locale.ENGLISH
-            else -> return context
-        }
-
-        val config = context.resources.configuration
-        config.setLocale(locale)
-        return context.createConfigurationContext(config)
     }
 }
