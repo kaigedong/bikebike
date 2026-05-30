@@ -1,4 +1,4 @@
-name: Build APK
+name: Build & Release
 
 on:
   push:
@@ -65,16 +65,70 @@ jobs:
       - name: Build APK
         run: ./gradlew assembleDebug
 
-      - name: Upload Debug APK
+      - name: Rename APK with commit info
+        run: |
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          DATE=$(date +%Y%m%d)
+          mv app/build/outputs/apk/debug/app-debug.apk \
+             app/build/outputs/apk/debug/bikebike-latest.apk
+          echo "APK_NAME=bikebike-latest.apk" >> $GITHUB_ENV
+          echo "SHORT_SHA=$SHORT_SHA" >> $GITHUB_ENV
+          echo "DATE=$DATE" >> $GITHUB_ENV
+
+      - name: Upload Debug APK (artifact)
         uses: actions/upload-artifact@v4
         with:
           name: bikebike-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
+          path: app/build/outputs/apk/debug/bikebike-latest.apk
 
-  # Check for Rust crate updates and auto-create PR
-  crate-updates:
+  release:
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+
+    steps:
+      - name: Download APK artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: bikebike-debug-apk
+          path: ./apk
+
+      - name: Generate release notes
+        id: notes
+        run: |
+          SHORT_SHA=$(git rev-parse --short HEAD) || SHORT_SHA="unknown"
+          DATE=$(date +%Y-%m-%d\ %H:%M)
+          COMMIT_MSG=$(git log -1 --pretty=%B | head -1) || COMMIT_MSG="build"
+          echo "notes<<EOF" >> $GITHUB_OUTPUT
+          echo "🚀 Auto build from \`main\` branch" >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+          echo "**Date**: ${DATE}" >> $GITHUB_OUTPUT
+          echo "**Commit**: \`${SHORT_SHA}\` - ${COMMIT_MSG}" >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+          echo "---" >> $GITHUB_OUTPUT
+          echo "Download \`bikebike-latest.apk\` and install." >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Delete old latest release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete latest --yes --cleanup-tag 2>/dev/null || true
+
+      - name: Create latest release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: "🔧 Latest Build"
+          body: ${{ steps.notes.outputs.notes }}
+          prerelease: false
+          files: ./apk/bikebike-latest.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  check-crates:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
     steps:
       - uses: actions/checkout@v4
 
@@ -85,7 +139,7 @@ jobs:
         working-directory: keep-core
         run: |
           cargo install cargo-outdated
-          cargo outdated --format markdown > ../crate_update_report.md
+          cargo outdated --format markdown > ../crate_update_report.md || true
           cat ../crate_update_report.md
 
       - name: Create issue for updates
