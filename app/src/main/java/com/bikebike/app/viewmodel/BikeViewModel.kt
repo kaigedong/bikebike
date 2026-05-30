@@ -226,10 +226,10 @@ class BikeViewModel(application: Application) : AndroidViewModel(application) {
      */
     private fun extractHandshakePacketsFromHci(data: ByteArray): List<String> {
         val prefixes = listOf(
-            byteArrayOf(0xA5.toByte(), 0xA5, 0xA0, 0x00),
-            byteArrayOf(0xA5.toByte(), 0xA5, 0xA0, 0x01),
-            byteArrayOf(0xA5.toByte(), 0xA5, 0xA0, 0x02),
-            byteArrayOf(0xA5.toByte(), 0xA5, 0xA0, 0x03),
+            byteArrayOf(0xA5.toByte(), 0xA5.toByte(), 0xA0.toByte(), 0x00.toByte()),
+            byteArrayOf(0xA5.toByte(), 0xA5.toByte(), 0xA0.toByte(), 0x01.toByte()),
+            byteArrayOf(0xA5.toByte(), 0xA5.toByte(), 0xA0.toByte(), 0x02.toByte()),
+            byteArrayOf(0xA5.toByte(), 0xA5.toByte(), 0xA0.toByte(), 0x03.toByte()),
         )
         val packets = mutableListOf<String>()
 
