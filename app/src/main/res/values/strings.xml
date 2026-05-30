@@ -39,6 +39,7 @@
     <!-- Log -->
     <string name="ble_log">BLE Log</string>
     <string name="no_log">No log entries</string>
+    <string name="log_disabled">Log is disabled</string>
 
     <!-- Settings -->
     <string name="settings">Settings</string>
@@ -60,4 +61,19 @@
     <string name="about">About</string>
     <string name="version">Version %s</string>
     <string name="no_handshake_warning">No handshake packets loaded. Communication may not work after connection.</string>
+
+    <!-- Identity Guide -->
+    <string name="how_to_get_identity">How to get the identity file?</string>
+    <string name="guide_step1">1. Enable Developer Options</string>
+    <string name="guide_step1_desc">Settings → About Phone → Tap \"Build Number\" 7 times</string>
+    <string name="guide_step2">2. Enable Bluetooth HCI Log</string>
+    <string name="guide_step2_desc">Developer Options → Enable \"Bluetooth HCI Snoop Log\", then restart Bluetooth</string>
+    <string name="guide_step3">3. Connect bike via Keep App</string>
+    <string name="guide_step3_desc">Open Keep App → Connect bike → Ride for 1–2 minutes → End session</string>
+    <string name="guide_step4">4. Export HCI log</string>
+    <string name="guide_step4_desc">Run on computer:\nadb bugreport bugreport.zip\nExtract FS/data/misc/bluetooth/logs/btsnoop_hci.log</string>
+    <string name="guide_step5">5. Generate identity.json</string>
+    <string name="guide_step5_desc">Run on computer:\npip install pyshark\npython identity_gen.py btsnoop_hci.log\nTransfer the generated identity.json to your phone</string>
+    <string name="guide_tips">💡 Tips</string>
+    <string name="guide_tips_desc">• The bike must be disconnected from WiFi\n• You may need to re-extract after firmware updates\n• identity_gen.py is in the BikeCon project: github.com/shinkisan/BikeCon</string>
 </resources>

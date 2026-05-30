@@ -39,6 +39,7 @@
     <!-- Log -->
     <string name="ble_log">BLE 日志</string>
     <string name="no_log">暂无日志</string>
+    <string name="log_disabled">日志已关闭</string>
 
     <!-- Settings -->
     <string name="settings">设置</string>
@@ -60,4 +61,19 @@
     <string name="about">关于</string>
     <string name="version">版本 %s</string>
     <string name="no_handshake_warning">未加载握手包，连接后可能无法通信</string>
+
+    <!-- Identity Guide -->
+    <string name="how_to_get_identity">如何获取身份文件？</string>
+    <string name="guide_step1">1. 开启开发者选项</string>
+    <string name="guide_step1_desc">设置 → 关于手机 → 连续点击"版本号" 7 次</string>
+    <string name="guide_step2">2. 开启蓝牙 HCI 日志</string>
+    <string name="guide_step2_desc">开发者选项 → 启用"蓝牙 HCI 监听日志"，然后重启蓝牙</string>
+    <string name="guide_step3">3. 用 Keep App 连接单车</string>
+    <string name="guide_step3_desc">打开 Keep App → 连接单车 → 骑行 1~2 分钟 → 结束运动</string>
+    <string name="guide_step4">4. 导出 HCI 日志</string>
+    <string name="guide_step4_desc">在电脑执行:\nadb bugreport bugreport.zip\n解压后找到 FS/data/misc/bluetooth/logs/btsnoop_hci.log</string>
+    <string name="guide_step5">5. 生成 identity.json</string>
+    <string name="guide_step5_desc">在电脑执行:\npip install pyshark\npython identity_gen.py btsnoop_hci.log\n将生成的 identity.json 传到手机</string>
+    <string name="guide_tips">💡 提示</string>
+    <string name="guide_tips_desc">• 单车必须断开 WiFi，否则数据可能走 WiFi\n• 每次固件更新后可能需要重新提取\n• identity_gen.py 在 BikeCon 项目中: github.com/shinkisan/BikeCon</string>
 </resources>

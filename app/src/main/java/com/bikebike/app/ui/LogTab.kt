@@ -77,7 +77,7 @@ fun LogTab(viewModel: BikeViewModel, modifier: Modifier = Modifier) {
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        "日志已关闭",
+                        stringResource(R.string.log_disabled),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

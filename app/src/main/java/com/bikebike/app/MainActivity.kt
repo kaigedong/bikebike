@@ -35,12 +35,8 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        // Apply saved language before setting content
-        val settings = AppSettings(this)
-        val langCode = settings.language.code
-        if (langCode != "system") {
-            LocaleHelper.applyLanguage(this, langCode)
-        }
+        // Apply saved locale config (silent, no recreate)
+        LocaleHelper.applyLocale(this)
 
         super.onCreate(savedInstanceState)
 
