@@ -17,6 +17,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.bikebike.app.data.AppSettings
+import com.bikebike.app.data.LocaleHelper
 import com.bikebike.app.ui.MainScreen
 import com.bikebike.app.ui.theme.BikeBikeTheme
 import com.bikebike.app.viewmodel.BikeViewModel
@@ -33,10 +35,14 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
+        // Apply saved language before setting content
+        val settings = AppSettings(this)
+        val langCode = settings.language.code
+        if (langCode != "system") {
+            LocaleHelper.applyLanguage(this, langCode)
+        }
 
-        // Initialize Timber for logging
-        // Timber.plant(Timber.DebugTree())
+        super.onCreate(savedInstanceState)
 
         // Check BLE support
         val bluetoothManager = getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager

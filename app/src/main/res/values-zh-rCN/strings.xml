@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">BikeBike</string>
+
+    <!-- Navigation -->
+    <string name="nav_ride">骑行</string>
+    <string name="nav_log">日志</string>
+    <string name="nav_settings">设置</string>
+
+    <!-- BLE -->
+    <string name="no_bluetooth_support">此设备不支持蓝牙低功耗</string>
+    <string name="permission_required">需要蓝牙和位置权限</string>
+    <string name="scan_devices">扫描设备</string>
+    <string name="scanning">扫描中…</string>
+    <string name="disconnect">断开</string>
+    <string name="discovered_devices">发现设备</string>
+
+    <!-- Connection states -->
+    <string name="state_disconnected">已断开</string>
+    <string name="state_scanning">扫描中</string>
+    <string name="state_connecting">连接中</string>
+    <string name="state_connected">已连接</string>
+
+    <!-- Metrics -->
+    <string name="ride_data">骑行数据</string>
+    <string name="speed">速度</string>
+    <string name="cadence">踏频</string>
+    <string name="power">功率</string>
+    <string name="resistance">档位</string>
+    <string name="calories">卡路里</string>
+    <string name="distance">距离</string>
+    <string name="duration">时长</string>
+
+    <!-- Resistance control -->
+    <string name="resistance_control">档位控制</string>
+    <string name="current_resistance">当前档位: %d</string>
+    <string name="confirm">确认 %d</string>
+
+    <!-- Log -->
+    <string name="ble_log">BLE 日志</string>
+    <string name="no_log">暂无日志</string>
+
+    <!-- Settings -->
+    <string name="settings">设置</string>
+    <string name="log_settings">日志设置</string>
+    <string name="enable_log">启用 BLE 日志</string>
+    <string name="enable_log_desc">记录所有 BLE 通信数据包 (hex)，方便调试</string>
+    <string name="device_connection">设备连接</string>
+    <string name="import_identity">导入身份文件</string>
+    <string name="import_identity_desc">从 Keep App HCI 日志提取的 identity.json 文件</string>
+    <string name="identity_loaded">已加载身份文件 (%d 个握手包)</string>
+    <string name="identity_not_loaded">未加载</string>
+    <string name="import_success">导入成功</string>
+    <string name="import_failed">导入失败: %s</string>
+    <string name="appearance">外观</string>
+    <string name="language">语言</string>
+    <string name="lang_system">跟随系统</string>
+    <string name="lang_zh">中文</string>
+    <string name="lang_en">English</string>
+    <string name="about">关于</string>
+    <string name="version">版本 %s</string>
+    <string name="no_handshake_warning">未加载握手包，连接后可能无法通信</string>
+</resources>
