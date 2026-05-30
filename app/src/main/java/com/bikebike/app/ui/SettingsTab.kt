@@ -241,96 +241,18 @@ private fun LanguageDialog(
 @Composable
 private fun UpdateCheckCard(context: Context) {
     var state by remember { mutableStateOf<UpdateState>(UpdateState.Idle) }
+    val settings = remember { AppSettings(context) }
 
-    Card(
-        onClick = {
-            if (state !is UpdateState.Checking && state !is UpdateState.Downloading) {
-                state = UpdateState.Checking
-                MainScope().launch(Dispatchers.IO) {
-                    try {
-                        val url = URL("https://api.github.com/repos/kaigedong/bikebike/releases/tags/latest")
-                        val conn = url.openConnection() as HttpURLConnection
-                        conn.requestMethod = "GET"
-                        conn.setRequestProperty("Accept", "application/vnd.github+json")
-                        conn.connectTimeout = 10000
-                        conn.readTimeout = 10000
-
-                        if (conn.responseCode != 200) {
-                            state = UpdateState.Error("HTTP ${conn.responseCode}")
-                            return@launch
-                        }
-
-                        val json = conn.inputStream.bufferedReader().readText()
-                        conn.disconnect()
-
-                        val jsonObj = JSONObject(json)
-                        val assets = jsonObj.optJSONArray("assets") ?: org.json.JSONArray()
-                        var apkUrl: String? = null
-                        for (i in 0 until assets.length()) {
-                            val asset = assets.getJSONObject(i)
-                            if (asset.optString("name") == "bikebike-latest.apk") {
-                                apkUrl = asset.optString("browser_download_url")
-                                break
-                            }
-                        }
-
-                        if (apkUrl == null) {
-                            state = UpdateState.Error("No APK found")
-                            return@launch
-                        }
-
-                        state = UpdateState.Downloading(0f)
-
-                        // Download
-                        val apkConn = URL(apkUrl).openConnection() as HttpURLConnection
-                        apkConn.connectTimeout = 30000
-                        apkConn.readTimeout = 60000
-                        val totalSize = apkConn.contentLength.toFloat()
-                        val input = apkConn.inputStream
-                        val tempFile = java.io.File(context.cacheDir, "bikebike-update.apk")
-                        val output = FileOutputStream(tempFile)
-                        val buffer = ByteArray(8192)
-                        var bytesRead: Int
-                        var totalRead = 0f
-
-                        while (input.read(buffer).also { bytesRead = it } != -1) {
-                            output.write(buffer, 0, bytesRead)
-                            totalRead += bytesRead
-                            if (totalSize > 0) {
-                                state = UpdateState.Downloading(totalRead / totalSize)
-                            }
-                        }
-                        output.close()
-                        input.close()
-                        apkConn.disconnect()
-
-                        val apkUri = androidx.core.content.FileProvider.getUriForFile(
-                            context, "${context.packageName}.fileprovider", tempFile)
-                        state = UpdateState.DownloadReady(apkUri)
-
-                        // Auto trigger install
-                        val intent = android.content.Intent(
-                            android.content.Intent.ACTION_VIEW, apkUri).apply {
-                            addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                            setDataAndType(apkUri, "application/vnd.android.package-archive")
-                        }
-                        context.startActivity(intent)
-
-                    } catch (e: Exception) {
-                        state = UpdateState.Error(e.message ?: "Unknown error")
-                    }
-                }
-            }
-        },
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
-    ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            when (state) {
-                is UpdateState.Idle -> {
+    when (state) {
+        is UpdateState.Idle -> {
+            Card(
+                onClick = {
+                    state = UpdateState.Checking
+                    MainScope().launch(Dispatchers.IO) { doUpdateCheck(context, settings) { state = it } }
+                },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+            ) {
+                Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Filled.SystemUpdate, contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary)
                     Spacer(modifier = Modifier.width(16.dp))
@@ -343,28 +265,68 @@ private fun UpdateCheckCard(context: Context) {
                     Icon(Icons.Filled.ChevronRight, contentDescription = null,
                         tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                is UpdateState.Checking -> {
+            }
+        }
+        is UpdateState.Checking -> {
+            Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                     CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
                     Spacer(modifier = Modifier.width(16.dp))
                     Text(stringResource(R.string.checking_update),
                         style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                    IconButton(onClick = { state = UpdateState.Idle }) {
+                        Icon(Icons.Filled.Close, contentDescription = "Cancel",
+                            modifier = Modifier.size(20.dp))
+                    }
                 }
-                is UpdateState.UpToDate -> {
+            }
+        }
+        is UpdateState.UpToDate -> {
+            Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Filled.CheckCircle, contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary)
                     Spacer(modifier = Modifier.width(16.dp))
                     Text(stringResource(R.string.already_latest),
                         style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                    IconButton(onClick = { state = UpdateState.Idle }) {
+                        Icon(Icons.Filled.Close, contentDescription = "Dismiss",
+                            modifier = Modifier.size(20.dp))
+                    }
                 }
-                is UpdateState.Downloading -> {
+            }
+        }
+        is UpdateState.Downloading -> {
+            Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                     CircularProgressIndicator(
                         progress = { (state as UpdateState.Downloading).progress },
                         modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
                     Spacer(modifier = Modifier.width(16.dp))
                     Text(stringResource(R.string.downloading_update),
                         style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                    IconButton(onClick = { state = UpdateState.Idle }) {
+                        Icon(Icons.Filled.Close, contentDescription = "Cancel",
+                            modifier = Modifier.size(20.dp))
+                    }
                 }
-                is UpdateState.DownloadReady -> {
+            }
+        }
+        is UpdateState.DownloadReady -> {
+            Card(
+                onClick = {
+                    val uri = (state as UpdateState.DownloadReady).uri
+                    val intent = android.content.Intent(
+                        android.content.Intent.ACTION_VIEW, uri).apply {
+                        addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                        setDataAndType(uri, "application/vnd.android.package-archive")
+                    }
+                    context.startActivity(intent)
+                },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+            ) {
+                Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Filled.InstallMobile, contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary)
                     Spacer(modifier = Modifier.width(16.dp))
@@ -372,9 +334,20 @@ private fun UpdateCheckCard(context: Context) {
                         Text(stringResource(R.string.install_update),
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.primary)
+                        Text(stringResource(R.string.install_update_desc),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    IconButton(onClick = { state = UpdateState.Idle }) {
+                        Icon(Icons.Filled.Close, contentDescription = "Dismiss",
+                            modifier = Modifier.size(20.dp))
                     }
                 }
-                is UpdateState.Error -> {
+            }
+        }
+        is UpdateState.Error -> {
+            Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Filled.Error, contentDescription = null,
                         tint = MaterialTheme.colorScheme.error)
                     Spacer(modifier = Modifier.width(16.dp))
@@ -386,9 +359,105 @@ private fun UpdateCheckCard(context: Context) {
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
+                    IconButton(onClick = { state = UpdateState.Idle }) {
+                        Icon(Icons.Filled.Close, contentDescription = "Dismiss",
+                            modifier = Modifier.size(20.dp))
+                    }
                 }
             }
         }
+    }
+}
+
+private fun doUpdateCheck(context: Context, settings: AppSettings, onState: (UpdateState) -> Unit) {
+    try {
+        val url = URL("https://api.github.com/repos/kaigedong/bikebike/releases/tags/latest")
+        val conn = url.openConnection() as HttpURLConnection
+        conn.requestMethod = "GET"
+        conn.setRequestProperty("Accept", "application/vnd.github+json")
+        conn.connectTimeout = 10000
+        conn.readTimeout = 10000
+
+        if (conn.responseCode != 200) {
+            onState(UpdateState.Error("HTTP ${conn.responseCode}"))
+            return
+        }
+
+        val json = conn.inputStream.bufferedReader().readText()
+        conn.disconnect()
+
+        val jsonObj = JSONObject(json)
+
+        // --- Version check: compare commit hash ---
+        // Release body contains commit hash like "Commit: abc1234 - ..."
+        val body = jsonObj.optString("body", "")
+        val remoteCommit = body.substringAfter("Commit: ").substringBefore(" - ").substringBefore("\n").trim()
+        val localCommit = settings.lastUpdateCommit
+
+        if (remoteCommit.isNotEmpty() && remoteCommit == localCommit) {
+            onState(UpdateState.UpToDate)
+            return
+        }
+
+        // Find APK asset
+        val assets = jsonObj.optJSONArray("assets") ?: org.json.JSONArray()
+        var apkUrl: String? = null
+        for (i in 0 until assets.length()) {
+            val asset = assets.getJSONObject(i)
+            if (asset.optString("name") == "bikebike-latest.apk") {
+                apkUrl = asset.optString("browser_download_url")
+                break
+            }
+        }
+
+        if (apkUrl == null) {
+            onState(UpdateState.Error("No APK found"))
+            return
+        }
+
+        onState(UpdateState.Downloading(0f))
+
+        // Download
+        val apkConn = URL(apkUrl).openConnection() as HttpURLConnection
+        apkConn.connectTimeout = 30000
+        apkConn.readTimeout = 60000
+        val totalSize = apkConn.contentLength.toFloat()
+        val input = apkConn.inputStream
+        val tempFile = java.io.File(context.cacheDir, "bikebike-update.apk")
+        val output = FileOutputStream(tempFile)
+        val buffer = ByteArray(8192)
+        var bytesRead: Int
+        var totalRead = 0f
+
+        while (input.read(buffer).also { bytesRead = it } != -1) {
+            output.write(buffer, 0, bytesRead)
+            totalRead += bytesRead
+            if (totalSize > 0) {
+                onState(UpdateState.Downloading(totalRead / totalSize))
+            }
+        }
+        output.close()
+        input.close()
+        apkConn.disconnect()
+
+        // Save commit hash so next check knows we're up to date
+        settings.lastUpdateCommit = remoteCommit
+
+        val apkUri = androidx.core.content.FileProvider.getUriForFile(
+            context, "${context.packageName}.fileprovider", tempFile)
+        onState(UpdateState.DownloadReady(apkUri))
+
+        // Auto trigger install
+        val intent = android.content.Intent(
+            android.content.Intent.ACTION_VIEW, apkUri).apply {
+            addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            setDataAndType(apkUri, "application/vnd.android.package-archive")
+        }
+        context.startActivity(intent)
+
+    } catch (e: Exception) {
+        onState(UpdateState.Error(e.message ?: "Unknown error"))
     }
 }
 

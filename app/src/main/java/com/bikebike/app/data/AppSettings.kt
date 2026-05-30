@@ -73,6 +73,12 @@ class AppSettings(context: Context) {
 
     fun hasIdentity(): Boolean = bikeMac.isNotEmpty() && loadHandshakePackets().isNotEmpty()
 
+    // ======================== Update Tracking ========================
+
+    var lastUpdateCommit: String
+        get() = prefs.getString("last_update_commit", "") ?: ""
+        set(value) = prefs.edit().putString("last_update_commit", value).apply()
+
     // ======================== Last Connected ========================
 
     var lastDeviceAddress: String
